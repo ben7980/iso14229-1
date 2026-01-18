@@ -1995,16 +1995,31 @@ static UDSErr_t Handle_0x38_RequestFileTransfer(UDSServer_t *srv, UDSReq_t *r) {
     UDSErr_t err = UDS_PositiveResponse;
 
     if (srv->xferIsActive) {
-        return NegativeResponse(r, UDS_NRC_ConditionsNotCorrect);
+        err = UDS_NRC_ConditionsNotCorrect;
+        goto done;
     }
     if (r->recv_len < UDS_0X38_REQ_BASE_LEN) {
-        return NegativeResponse(r, UDS_NRC_IncorrectMessageLengthOrInvalidFormat);
+        err = UDS_NRC_IncorrectMessageLengthOrInvalidFormat;
+        goto done;
     }
 
     uint8_t mode_of_operation = r->recv_buf[1];
-    if (mode_of_operation < UDS_MOOP_ADDFILE || mode_of_operation > UDS_MOOP_RDFILE) {
-        return NegativeResponse(r, UDS_NRC_IncorrectMessageLengthOrInvalidFormat);
+
+    switch (mode_of_operation) {
+    case UDS_MOOP_ADDFILE:
+    case UDS_MOOP_DELFILE:
+    case UDS_MOOP_REPLFILE:
+    case UDS_MOOP_RDFILE:
+    case UDS_MOOP_RDDIR:
+        break;
+    case UDS_MOOP_RSFILE:
+        err = UDS_NRC_SubFunctionNotSupported;
+        goto done;
+    default:
+        err = UDS_NRC_IncorrectMessageLengthOrInvalidFormat;
+        goto done;
     }
+
     uint16_t file_path_len = (uint16_t)(((uint16_t)r->recv_buf[2] << 8) + (uint16_t)r->recv_buf[3]);
     uint8_t data_format_identifier = 0;
     uint8_t file_size_parameter_length = 0;
@@ -2013,7 +2028,8 @@ static UDSErr_t Handle_0x38_RequestFileTransfer(UDSServer_t *srv, UDSReq_t *r) {
     uint16_t byte_idx = 4 + file_path_len;
 
     if (byte_idx > r->recv_len) {
-        return NegativeResponse(r, UDS_NRC_IncorrectMessageLengthOrInvalidFormat);
+        err = UDS_NRC_IncorrectMessageLengthOrInvalidFormat;
+        goto done;
     }
 
     if ((mode_of_operation == UDS_MOOP_DELFILE) || (mode_of_operation == UDS_MOOP_RDDIR)) {
@@ -2042,10 +2058,12 @@ static UDSErr_t Handle_0x38_RequestFileTransfer(UDSServer_t *srv, UDSReq_t *r) {
         static_assert(sizeof(file_size_uncompressed) == sizeof(file_size_compressed),
                       "Both should be k-byte numbers per Table 480");
         if (file_size_parameter_length > sizeof(file_size_compressed)) {
-            return NegativeResponse(r, UDS_NRC_RequestOutOfRange);
+            err = UDS_NRC_RequestOutOfRange;
+            goto done;
         }
         if (byte_idx + 2 * file_size_uncompressed > r->recv_len) {
-            return NegativeResponse(r, UDS_NRC_RequestOutOfRange);
+            err = UDS_NRC_RequestOutOfRange;
+            goto done;
         }
         for (size_t i = 0; i < file_size_parameter_length; i++) {
             uint8_t data_byte = r->recv_buf[byte_idx];
@@ -2073,7 +2091,7 @@ static UDSErr_t Handle_0x38_RequestFileTransfer(UDSServer_t *srv, UDSReq_t *r) {
     err = EmitEvent(srv, UDS_EVT_RequestFileTransfer, &args);
 
     if (UDS_PositiveResponse != err) {
-        return NegativeResponse(r, err);
+        goto done;
     }
 
     ResetTransfer(srv);
@@ -2097,7 +2115,8 @@ static UDSErr_t Handle_0x38_RequestFileTransfer(UDSServer_t *srv, UDSReq_t *r) {
         args.dataFormatIdentifier;
 
     r->send_len = UDS_0X38_RESP_BASE_LEN + (size_t)sizeof(args.maxNumberOfBlockLength) + 1;
-    return UDS_PositiveResponse;
+done:
+    return err;
 }
 
 static UDSErr_t Handle_0x3D_WriteMemoryByAddress(UDSServer_t *srv, UDSReq_t *r) {
