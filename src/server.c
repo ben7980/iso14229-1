@@ -1134,18 +1134,18 @@ static UDSErr_t Handle_0x38_RequestFileTransfer(UDSServer_t *srv, UDSReq_t *r) {
     uint8_t mode_of_operation = r->recv_buf[1];
 
     switch (mode_of_operation) {
-        case UDS_MOOP_ADDFILE:
-        case UDS_MOOP_DELFILE:
-        case UDS_MOOP_REPLFILE:
-        case UDS_MOOP_RDFILE:
-        case UDS_MOOP_RDDIR:
-            break;
-        case UDS_MOOP_RSFILE:
-            err = UDS_NRC_SubFunctionNotSupported;
-            goto done;
-        default:
-            err = UDS_NRC_IncorrectMessageLengthOrInvalidFormat;
-            goto done;
+    case UDS_MOOP_ADDFILE:
+    case UDS_MOOP_DELFILE:
+    case UDS_MOOP_REPLFILE:
+    case UDS_MOOP_RDFILE:
+    case UDS_MOOP_RDDIR:
+        break;
+    case UDS_MOOP_RSFILE:
+        err = UDS_NRC_SubFunctionNotSupported;
+        goto done;
+    default:
+        err = UDS_NRC_IncorrectMessageLengthOrInvalidFormat;
+        goto done;
     }
 
     uint16_t file_path_len = (uint16_t)(((uint16_t)r->recv_buf[2] << 8) + (uint16_t)r->recv_buf[3]);
@@ -1222,6 +1222,14 @@ static UDSErr_t Handle_0x38_RequestFileTransfer(UDSServer_t *srv, UDSReq_t *r) {
         goto done;
     }
 
+    r->send_buf[0] = UDS_RESPONSE_SID_OF(kSID_REQUEST_FILE_TRANSFER);
+    r->send_buf[1] = args.modeOfOperation;
+
+    if (mode_of_operation == UDS_MOOP_DELFILE) {
+        r->send_len = 2;
+        goto done;
+    }
+
     ResetTransfer(srv);
     srv->xferIsActive = true;
     srv->xferTotalBytes = args.fileSizeCompressed;
@@ -1231,19 +1239,22 @@ static UDSErr_t Handle_0x38_RequestFileTransfer(UDSServer_t *srv, UDSReq_t *r) {
         args.maxNumberOfBlockLength = UDS_TP_MTU;
     }
 
-    r->send_buf[0] = UDS_RESPONSE_SID_OF(kSID_REQUEST_FILE_TRANSFER);
-    r->send_buf[1] = args.modeOfOperation;
+    // A_Data byte 3: lengthFormatIdentifier
     r->send_buf[2] = (uint8_t)sizeof(args.maxNumberOfBlockLength);
+    r->send_len = 3;
+
+    // A_Data bytes 4 to 4+m-1: maxNumberOfBlockLength
     for (uint8_t idx = 0; idx < (uint8_t)sizeof(args.maxNumberOfBlockLength); idx++) {
         uint8_t shiftBytes = (uint8_t)(sizeof(args.maxNumberOfBlockLength) - 1 - idx);
         uint8_t byte = (uint8_t)(args.maxNumberOfBlockLength >> (shiftBytes * 8));
-        r->send_buf[UDS_0X38_RESP_BASE_LEN + idx] = byte;
+        r->send_buf[3 + idx] = byte;
     }
-    r->send_buf[UDS_0X38_RESP_BASE_LEN + (size_t)sizeof(args.maxNumberOfBlockLength)] =
-        args.dataFormatIdentifier;
 
-    r->send_len = UDS_0X38_RESP_BASE_LEN + (size_t)sizeof(args.maxNumberOfBlockLength) + 1;
-    done:
+    r->send_buf[3 + (size_t)sizeof(args.maxNumberOfBlockLength)] = args.dataFormatIdentifier;
+
+    r->send_len = 3 + (size_t)sizeof(args.maxNumberOfBlockLength);
+
+done:
     return err;
 }
 

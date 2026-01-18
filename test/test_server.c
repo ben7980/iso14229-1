@@ -3828,6 +3828,9 @@ void test_0x38_delfile(void **state) {
     EXPECT_WITHIN_MS(e, UDSTpRecv(e->client_tp, buf, sizeof(buf), NULL) > 0,
                      UDS_CLIENT_DEFAULT_P2_MS);
     TEST_MEMORY_EQUAL(buf, RESP, sizeof(RESP));
+
+    // https://github.com/driftregion/iso14229/issues/115
+    TEST_INT_EQUAL(e->server->xferIsActive, 0);
 }
 
 int fn_test_0x3e_suppress_positive_response(UDSServer_t *srv, UDSEvent_t ev, void *arg) {
