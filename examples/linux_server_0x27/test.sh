@@ -20,8 +20,9 @@ TIMEOUT_PID=$!
 
 ./server &
 SERVER_PID=$!
-# Give server time to start
-sleep 1
+# Give server time to start greater than 
+# UDS_SERVER_0x27_BRUTE_FORCE_MITIGATION_BOOT_DELAY_MS
+sleep 2
 
 ./client &
 CLIENT_PID=$!

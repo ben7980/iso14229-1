@@ -28,6 +28,10 @@ int Teardown(void **state) {
     return 0;
 }
 
+int fn_return_positive_response(UDSServer_t *srv, UDSEvent_t ev, void *arg) {
+    return UDS_PositiveResponse;
+}
+
 int fn_test_session_timeout(UDSServer_t *srv, UDSEvent_t ev, void *arg) {
     int *call_count = (int *)srv->fn_data;
     TEST_INT_EQUAL(UDS_EVT_SessionTimeout, ev);
@@ -97,13 +101,9 @@ void test_0x10_no_fn_results_in_negative_resp_functional(void **state) {
     TEST_MEMORY_EQUAL(buf, EXP_RESP, sizeof(EXP_RESP));
 }
 
-int fn_test_0x10_diagnostic_session_control(UDSServer_t *srv, UDSEvent_t ev, void *arg) {
-    return UDS_PositiveResponse;
-}
-
 void test_0x10_suppress_pos_resp(void **state) {
     Env_t *e = *state;
-    e->server->fn = fn_test_0x10_diagnostic_session_control;
+    e->server->fn = fn_return_positive_response;
     uint8_t buf[8] = {0};
 
     // When a diagnostic session control request is sent to the server with the
@@ -164,14 +164,12 @@ void test_0x11_no_send_after_ECU_reset(void **state) {
     TEST_INT_EQUAL(call_count, 1);
 }
 
-int fn_test_0x14(UDSServer_t *srv, UDSEvent_t ev, void *arg) { return UDS_PositiveResponse; }
-
 // ISO14229-1 2020 12.2.5 Message flow example ClearDiagnosticInformation
 void test_0x14_positive_response(void **state) {
     Env_t *e = *state;
     uint8_t buf[20] = {0};
 
-    e->server->fn = fn_test_0x14;
+    e->server->fn = fn_return_positive_response;
     e->server->fn_data = NULL;
 
     /* Request per ISO14229-1 2020 Table 300 */
@@ -199,7 +197,7 @@ void test_0x14_incorrect_request_length(void **state) {
     Env_t *e = *state;
     uint8_t buf[20] = {0};
 
-    e->server->fn = fn_test_0x14;
+    e->server->fn = fn_return_positive_response;
     e->server->fn_data = NULL;
 
     const uint8_t REQ[] = {
@@ -2511,15 +2509,13 @@ void test_0x22_nonexistent(void **state) {
     TEST_MEMORY_EQUAL(buf, RESP, sizeof(RESP));
 }
 
-int fn_test_0x22_misuse(UDSServer_t *srv, UDSEvent_t ev, void *arg) { return UDS_PositiveResponse; }
-
 void test_0x22_misuse(void **state) {
     Env_t *e = *state;
     uint8_t buf[8] = {0};
 
     // When a server handler function is installed that does not handle the
     // UDS_EVT_ReadDataByIdent event
-    e->server->fn = fn_test_0x22_misuse;
+    e->server->fn = fn_return_positive_response;
 
     // and a request is sent to the server
     const uint8_t REQ[] = {0x22, 0xF1, 0x90};
@@ -3818,9 +3814,41 @@ void test_0x38_delfile(void **state) {
     e->server->fn = fn_test_0x38_delfile;
 
     // sending this request to the server
-    const uint8_t DELFILE_REQUEST[] = {0x38, 0x02, 0x00, 0x12, 0x2F, 0x64, 0x61, 0x74,
-                                       0x61, 0x2F, 0x74, 0x65, 0x73, 0x74, 0x66, 0x69,
-                                       0x6C, 0x65, 0x2E, 0x7A, 0x69, 0x70};
+    const uint8_t DELFILE_REQUEST[] = {0x38, // RequestFileTransfer
+                                       0x02, // DelFile
+                                       0x00, // filePathAndNameLength MSB
+                                       0x12, // filePathAndNameLength LSB
+                                       // "/data/testfile.zip" (18 bytes)
+                                       0x2F, 0x64, 0x61, 0x74, 0x61, 0x2F, 0x74, 0x65, 0x73, 0x74,
+                                       0x66, 0x69, 0x6C, 0x65, 0x2E, 0x7A, 0x69, 0x70};
+    UDSTpSend(e->client_tp, DELFILE_REQUEST, sizeof(DELFILE_REQUEST), NULL);
+
+    // should receive a positive response matching UDS-1:2013 Table 435
+    const uint8_t RESP[] = {0x78, 0x02};
+    EXPECT_WITHIN_MS(e, UDSTpRecv(e->client_tp, buf, sizeof(buf), NULL) > 0,
+                     UDS_CLIENT_DEFAULT_P2_MS);
+    TEST_MEMORY_EQUAL(buf, RESP, sizeof(RESP));
+
+    // https://github.com/driftregion/iso14229/issues/115
+    TEST_INT_EQUAL(e->server->xferIsActive, 0);
+}
+
+void test_0x38_delfile_issue_116(void **state) {
+    Env_t *e = *state;
+    uint8_t buf[8] = {0};
+
+    // When a handler is installed
+    e->server->fn = fn_return_positive_response;
+
+    // and the shortest possible DELFILE request is sent,
+    // where filePathAndNameLength == 1
+    const uint8_t DELFILE_REQUEST[] = {
+        0x38, // RequestFileTransfer
+        0x02, // DelFile
+        0x00, // filePathAndNameLength MSB
+        0x01, // filePathAndNameLength LSB
+        0x78  // 'x', the filePathAndName
+    };
     UDSTpSend(e->client_tp, DELFILE_REQUEST, sizeof(DELFILE_REQUEST), NULL);
 
     // should receive a positive response matching UDS-1:2013 Table 435
@@ -3830,14 +3858,10 @@ void test_0x38_delfile(void **state) {
     TEST_MEMORY_EQUAL(buf, RESP, sizeof(RESP));
 }
 
-int fn_test_0x3e_suppress_positive_response(UDSServer_t *srv, UDSEvent_t ev, void *arg) {
-    return UDS_PositiveResponse;
-}
-
 void test_0x3e_suppress_positive_response(void **state) {
     Env_t *e = *state;
     uint8_t buf[8] = {0};
-    e->server->fn = fn_test_0x3e_suppress_positive_response;
+    e->server->fn = fn_return_positive_response;
 
     // When the suppressPositiveResponse bit is set
     const uint8_t REQ[] = {0x3E, 0x80};
@@ -4287,6 +4311,7 @@ int main(int ac, char **av) {
         cmocka_unit_test_setup_teardown(test_0x38_no_handler, Setup, Teardown),
         cmocka_unit_test_setup_teardown(test_0x38_addfile, Setup, Teardown),
         cmocka_unit_test_setup_teardown(test_0x38_delfile, Setup, Teardown),
+        cmocka_unit_test_setup_teardown(test_0x38_delfile_issue_116, Setup, Teardown),
         cmocka_unit_test_setup_teardown(test_0x3D_example_1, Setup, Teardown),
         cmocka_unit_test_setup_teardown(test_0x3D_example_2, Setup, Teardown),
         cmocka_unit_test_setup_teardown(test_0x3D_example_3, Setup, Teardown),
