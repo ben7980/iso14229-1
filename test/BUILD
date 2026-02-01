@@ -1,3 +1,6 @@
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test", "cc_binary")
+
 cc_library(
     name = "env",
     srcs = [
@@ -14,37 +17,53 @@ cc_library(
     })
 )
 
-TEST_SRCS = [
-    "test_client.c",
-    "test_server.c",
-]
+cc_test(
+    name="test_server", 
+    srcs = [
+        "test_server.c",
+    ],
+    deps = [ 
+        "//:iso14229",
+        "@cmocka",
+        ":env",
+    ],
+    size = "small",
+    copts = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": [ "-g", ],
+    }),
+    defines = [
+        "UDS_TP_ISOTP_MOCK",
+        "UDS_CUSTOM_MILLIS",
+        "UDS_LOG_LEVEL=UDS_LOG_VERBOSE",
+        "UDS_LINES",
+    ],
+)
 
-TEST_NAMES = [ src.split(".c")[0] for src in TEST_SRCS ]
+cc_test(
+    name="test_client", 
+    srcs = [
+        "test_client.c",
+    ],
+    deps = [ 
+        "//:iso14229",
+        "@cmocka",
+        ":env",
+    ],
+    size = "small",
+    copts = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": [ "-g", ],
+    }),
+    defines = [
+        "UDS_TP_ISOTP_MOCK",
+        "UDS_CUSTOM_MILLIS",
+        "UDS_LOG_LEVEL=UDS_LOG_VERBOSE",
+        "UDS_LINES",
+    ],
+)
 
-[
-    cc_test(
-        name=name + "_tp_mock", 
-        srcs = [
-            src,
-        ],
-        deps = [ 
-            "//:iso14229",
-            "@cmocka",
-            ":env",
-        ],
-        size = "small",
-        copts = select({
-            "@platforms//os:windows": [],
-            "//conditions:default": [ "-g", ],
-        }),
-        defines = [
-            "UDS_TP_ISOTP_MOCK",
-            "UDS_CUSTOM_MILLIS",
-            "UDS_LOG_LEVEL=UDS_LOG_VERBOSE",
-            "UDS_LINES",
-        ],
-    ) for name, src in zip(TEST_NAMES, TEST_SRCS)
-]
+
 
 cc_library(
     name = "test_prefix_c",
