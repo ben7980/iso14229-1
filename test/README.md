@@ -9,6 +9,11 @@ bazel test //test:all --test_tag_filters=-vcan
 
 # run tests and log all output to stdout
 bazel test --test_output=all //test:all
+
+# unit test development workflow example: 
+# building the server unit test suite and running a single test case under gdb 
+bazel build //test:test_server && \
+gdb -args bazel-bin/test/test_server test_0x38_addfile
 ```
 
 ## Coverage Testing
@@ -23,7 +28,7 @@ Coverage is generated using two targets:
 
 ```sh
 # generate coverage
-bazel coverage -s --combined_report=lcov --instrumentation_filter='^//:(iso14229)$'  --experimental_collect_code_coverage_for_generated_files --nocache_test_results //test:test_client_tp_mock //test:test_server_tp_mock //test:test_tp_isotp_compliance_mock
+bazel coverage -s --combined_report=lcov --instrumentation_filter='^//:(iso14229)$'  --experimental_collect_code_coverage_for_generated_files --nocache_test_results //test:test_client //test:test_server //test:test_tp_isotp_compliance_mock
 
 genhtml --branch-coverage --output-directory coverage_html "$(bazel info output_path)/_coverage/_coverage_report.dat"
 ```
