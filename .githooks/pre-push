@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+tools/run_clang_format.sh
+tools/update_srcs.sh
+
+if ! git diff --exit-code; then
+    echo "ERROR: There are unstaged changes after running clang-format and update_srcs.sh"
+    git diff
+    exit 1
+fi

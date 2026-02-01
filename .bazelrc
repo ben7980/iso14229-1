@@ -16,6 +16,7 @@ common:hermetic-fuzz --@rules_fuzzing//fuzzing:cc_engine_sanitizer=asan
 
 # Hermetic coverage configuration
 common:hermetic-coverage --config=hermetic-llvm
+common:hermetic-coverage --extra_execution_platforms=//platforms:x86_64_clang
 common:hermetic-coverage --@rules_fuzzing//fuzzing:cc_engine=@rules_fuzzing//fuzzing/engines:replay
 common:hermetic-coverage --@rules_fuzzing//fuzzing:cc_engine_instrumentation=none
 common:hermetic-coverage --@rules_fuzzing//fuzzing:cc_engine_sanitizer=none

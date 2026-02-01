@@ -1,11 +1,19 @@
 module(name = "iso14229")
+
+bazel_dep(name = "platforms", version="1.0.0")
+bazel_dep(name = "rules_python", version = "1.8.2")
+bazel_dep(name = "rules_shell", version="0.6.1")
+bazel_dep(name = "rules_cc", version="0.2.16")
+bazel_dep(name = "toolchains_llvm", version = "1.4.0")
+
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 git_override(
     module_name = "hedron_compile_commands",
     remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
-    commit = "4f28899228fb3ad0126897876f147ca15026151e",
+    # https://github.com/hedronvision/bazel-compile-commands-extractor/pull/278
+    commit = "7fe1eab26d2b8eeb5e1c6a2f38bddb001e3f9696",
 )
 
 http_archive(
@@ -32,17 +40,6 @@ http_archive(
     type = ".zip",
 )
 
-# https://github.com/bazelbuild/bazel/issues/18616
-http_archive(
-    name = "rules_cc",
-    urls = ["https://github.com/bazelbuild/rules_cc/releases/download/0.0.17/rules_cc-0.0.17.tar.gz"],
-    sha256 = "abc605dd850f813bb37004b77db20106a19311a96b2da1c92b789da529d28fe1",
-    strip_prefix = "rules_cc-0.0.17",
-)
-
-bazel_dep(name = "platforms", version="1.0.0")
-
-bazel_dep(name = "toolchains_llvm", version = "1.4.0")
 
 # Chromium sysroot (Debian Bullseye) - includes isotp headers
 http_archive(
@@ -63,7 +60,7 @@ filegroup(
 # Configure and register the toolchain.
 git_override(
   module_name = "toolchains_llvm",
-  commit = "d103be73bce9a804ebc4e57637fbaf9d6f23e682",
+  commit = "ace6215bbfe8a76884646b2458b42380e2201607",
   remote = "https://github.com/bazel-contrib/toolchains_llvm",
 )
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")

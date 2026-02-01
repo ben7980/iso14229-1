@@ -2022,7 +2022,7 @@ static UDSErr_t Handle_0x38_RequestFileTransfer(UDSServer_t *srv, UDSReq_t *r) {
 
     uint16_t file_path_len = (uint16_t)(((uint16_t)r->recv_buf[2] << 8) + (uint16_t)r->recv_buf[3]);
     uint8_t data_format_identifier = 0;
-    uint8_t file_size_parameter_length = 0;
+    uint8_t file_size_parameter_length = 0; // also called "k" in ISO14229:2020
     size_t file_size_uncompressed = 0;
     size_t file_size_compressed = 0;
     uint16_t byte_idx = 4 + file_path_len;
@@ -2061,7 +2061,9 @@ static UDSErr_t Handle_0x38_RequestFileTransfer(UDSServer_t *srv, UDSReq_t *r) {
             err = UDS_NRC_RequestOutOfRange;
             goto done;
         }
-        if (byte_idx + 2 * file_size_uncompressed > r->recv_len) {
+        // the remaining two request fields (fileSizeUncompressed and fileSizeCompressed) are each
+        // file_size_parameter_length (k) bytes long
+        if ((size_t)byte_idx + 2 * file_size_parameter_length > r->recv_len) {
             err = UDS_NRC_RequestOutOfRange;
             goto done;
         }
